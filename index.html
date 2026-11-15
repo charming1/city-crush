@@ -549,10 +549,11 @@ window.APP_CONFIG = {
   },
   // AdMob. Only used inside the Android app (Capacitor). The values below are Google's TEST ids: safe to use while building.
   admob: {
+    debug: true,        // shows a small message when a banner loads or fails. Set to false before the Play Store
     useTestIds: false,  // live ads. Set to true again while testing on your own phone
-    banner: 'ca-app-pub-7213730306552835/4466795289',
-    interstitial: 'ca-app-pub-7213730306552835/6259048242',
-    rewarded: 'ca-app-pub-7213730306552835/2375643551',
+    banner: 'ca-app-pub-2838889844136825/5371975002',
+    interstitial: 'ca-app-pub-2838889844136825/5788274958',
+    rewarded: 'ca-app-pub-2838889844136825/2745811664',
   },
 };
 window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeria"], ["AD", "Andorra"], ["AO", "Angola"], ["AG", "Antigua and Barbuda"], ["AR", "Argentina"], ["AM", "Armenia"], ["AU", "Australia"], ["AT", "Austria"], ["AZ", "Azerbaijan"], ["BS", "Bahamas"], ["BH", "Bahrain"], ["BD", "Bangladesh"], ["BB", "Barbados"], ["BY", "Belarus"], ["BE", "Belgium"], ["BZ", "Belize"], ["BJ", "Benin"], ["BT", "Bhutan"], ["BO", "Bolivia"], ["BA", "Bosnia and Herzegovina"], ["BW", "Botswana"], ["BR", "Brazil"], ["BN", "Brunei"], ["BG", "Bulgaria"], ["BF", "Burkina Faso"], ["BI", "Burundi"], ["CV", "Cabo Verde"], ["KH", "Cambodia"], ["CM", "Cameroon"], ["CA", "Canada"], ["CF", "Central African Republic"], ["TD", "Chad"], ["CL", "Chile"], ["CN", "China"], ["CO", "Colombia"], ["KM", "Comoros"], ["CG", "Congo"], ["CR", "Costa Rica"], ["CI", "Côte d'Ivoire"], ["HR", "Croatia"], ["CU", "Cuba"], ["CY", "Cyprus"], ["CZ", "Czechia"], ["CD", "DR Congo"], ["DK", "Denmark"], ["DJ", "Djibouti"], ["DM", "Dominica"], ["DO", "Dominican Republic"], ["EC", "Ecuador"], ["SV", "El Salvador"], ["GQ", "Equatorial Guinea"], ["ER", "Eritrea"], ["EE", "Estonia"], ["SZ", "Eswatini"], ["ET", "Ethiopia"], ["FJ", "Fiji"], ["FI", "Finland"], ["GA", "Gabon"], ["GM", "Gambia"], ["GE", "Georgia"], ["DE", "Germany"], ["GH", "Ghana"], ["GR", "Greece"], ["GD", "Grenada"], ["GT", "Guatemala"], ["GN", "Guinea"], ["GW", "Guinea-Bissau"], ["GY", "Guyana"], ["HT", "Haiti"], ["HN", "Honduras"], ["HU", "Hungary"], ["IS", "Iceland"], ["IN", "India"], ["ID", "Indonesia"], ["IR", "Iran"], ["IQ", "Iraq"], ["IE", "Ireland"], ["IL", "Israel"], ["JM", "Jamaica"], ["JO", "Jordan"], ["KZ", "Kazakhstan"], ["KE", "Kenya"], ["KI", "Kiribati"], ["KW", "Kuwait"], ["KG", "Kyrgyzstan"], ["LA", "Laos"], ["LV", "Latvia"], ["LB", "Lebanon"], ["LS", "Lesotho"], ["LR", "Liberia"], ["LY", "Libya"], ["LI", "Liechtenstein"], ["LT", "Lithuania"], ["LU", "Luxembourg"], ["MG", "Madagascar"], ["MW", "Malawi"], ["MY", "Malaysia"], ["MV", "Maldives"], ["ML", "Mali"], ["MT", "Malta"], ["MH", "Marshall Islands"], ["MR", "Mauritania"], ["MU", "Mauritius"], ["MX", "Mexico"], ["FM", "Micronesia"], ["MD", "Moldova"], ["MC", "Monaco"], ["MN", "Mongolia"], ["ME", "Montenegro"], ["MA", "Morocco"], ["MZ", "Mozambique"], ["MM", "Myanmar"], ["NA", "Namibia"], ["NR", "Nauru"], ["NP", "Nepal"], ["NL", "Netherlands"], ["NZ", "New Zealand"], ["NI", "Nicaragua"], ["NE", "Niger"], ["NG", "Nigeria"], ["KP", "North Korea"], ["MK", "North Macedonia"], ["NO", "Norway"], ["OM", "Oman"], ["PK", "Pakistan"], ["PW", "Palau"], ["PA", "Panama"], ["PG", "Papua New Guinea"], ["PY", "Paraguay"], ["PE", "Peru"], ["PH", "Philippines"], ["PL", "Poland"], ["PT", "Portugal"], ["QA", "Qatar"], ["KR", "South Korea"], ["RO", "Romania"], ["RU", "Russia"], ["RW", "Rwanda"], ["KN", "Saint Kitts and Nevis"], ["LC", "Saint Lucia"], ["VC", "Saint Vincent and the Grenadines"], ["WS", "Samoa"], ["SM", "San Marino"], ["ST", "São Tomé and Príncipe"], ["SA", "Saudi Arabia"], ["SN", "Senegal"], ["RS", "Serbia"], ["SC", "Seychelles"], ["SL", "Sierra Leone"], ["SG", "Singapore"], ["SK", "Slovakia"], ["SI", "Slovenia"], ["SB", "Solomon Islands"], ["SO", "Somalia"], ["ZA", "South Africa"], ["SS", "South Sudan"], ["ES", "Spain"], ["LK", "Sri Lanka"], ["SD", "Sudan"], ["SR", "Suriname"], ["SE", "Sweden"], ["CH", "Switzerland"], ["SY", "Syria"], ["TJ", "Tajikistan"], ["TZ", "Tanzania"], ["TH", "Thailand"], ["TL", "Timor-Leste"], ["TG", "Togo"], ["TO", "Tonga"], ["TT", "Trinidad and Tobago"], ["TN", "Tunisia"], ["TR", "Türkiye"], ["TM", "Turkmenistan"], ["TV", "Tuvalu"], ["UG", "Uganda"], ["UA", "Ukraine"], ["AE", "United Arab Emirates"], ["UY", "Uruguay"], ["UZ", "Uzbekistan"], ["VU", "Vanuatu"], ["VE", "Venezuela"], ["VN", "Vietnam"], ["YE", "Yemen"], ["ZM", "Zambia"], ["ZW", "Zimbabwe"]];
@@ -834,7 +835,7 @@ window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeri
           const r = await A.showRewardVideoAd(); if (r) rewarded = true;
         } finally { try { h1.remove(); } catch (e) { } }
         return { shown: true, rewarded };
-      } catch (e) { return { shown: false, rewarded: false }; }
+      } catch (e) { if (AD_CFG.debug) toast('AdMob ' + kind + ' error: ' + ((e && (e.message || e.code)) || e)); return { shown: false, rewarded: false }; }
     },
     /** Shows the native banner on the home screen and in the win / out-of-moves popups, hides it elsewhere. */
     async syncBanner() {
@@ -846,9 +847,11 @@ window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeri
         if (want) {
           if (!nativeInit) nativeInit = A.initialize({ initializeForTesting: !!AD_CFG.useTestIds });
           await nativeInit;
+          if (!Ads._bl && AD_CFG.debug) { Ads._bl = true; try { A.addListener('bannerAdFailedToLoad', (e) => toast('Banner ad error ' + ((e && (e.code !== undefined ? e.code : e.errorCode)) || '') + ' ' + ((e && (e.message || e.reason)) || ''))); A.addListener('bannerAdLoaded', () => toast('Banner ad loaded')); } catch (x) { } }
+          if (AD_CFG.debug) toast('AdMob: asking for a banner...');
           await A.showBanner({ adId: AD_CFG.banner, adSize: 'BANNER', position: 'BOTTOM_CENTER', margin: 0, isTesting: !!AD_CFG.useTestIds });
         } else await A.hideBanner();
-      } catch (e) { nativeBannerOn = false; }
+      } catch (e) { nativeBannerOn = false; if (AD_CFG.debug) toast('AdMob banner error: ' + ((e && (e.message || e.code)) || e)); }
     },
     _show(title, seconds, rewarded) {
       return new Promise((resolve) => {
