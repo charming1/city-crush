@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0d3b82">
+<title>City Crush</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@700;800;900&display=swap">
+<!--INLINE_CSS--><link rel="stylesheet" href="style.css"><!--/INLINE_CSS-->
+</head>
+<body>
+<div id="app">
+
+  <!-- Home -->
+  <section id="screen-home" class="screen home">
+    <div id="homeHero" class="home-hero" aria-hidden="true"></div>
+    <h1 class="logo"><span>City</span><span>Crush</span></h1>
+    <p class="tagline">Match landmarks. Tour the world.</p>
+    <div class="home-actions">
+      <button id="btnPlay" class="btn btn-green btn-xl" type="button">
+        <span class="btn-main">Play</span><span id="playSub" class="btn-sub"></span>
+      </button>
+      <button id="btnWorld" class="btn btn-blue" type="button">World map</button>
+    </div>
+    <div class="home-foot">
+      <button id="btnSettingsHome" class="icon-btn" type="button" aria-label="Settings"></button>
+      <div id="homeStars" class="chip"></div>
+    </div>
+    <div id="homeBanner" class="home-banner"></div>
+  </section>
+
+  <!-- World map -->
+  <section id="screen-map" class="screen" hidden>
+    <header class="topbar">
+      <button id="mapBack" class="icon-btn" type="button" aria-label="Back to home"></button>
+      <h2 class="topbar-title">World tour</h2>
+      <div id="mapStars" class="chip"></div>
+    </header>
+    <div class="map-search"><input id="mapSearch" type="search" placeholder="Search 193 countries" autocomplete="off" aria-label="Search countries"></div>
+    <div id="mapScroll">
+      <div id="route">
+        <svg id="routeSvg" aria-hidden="true"></svg>
+        <div id="nodes"></div>
+        <div id="plane" aria-hidden="true"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Game -->
+  <section id="screen-game" class="screen" hidden>
+    <header class="game-top">
+      <button id="btnBack" class="icon-btn" type="button" aria-label="Back to map"></button>
+      <div class="banner panel-header">
+        <div id="levelText" class="banner-level"></div>
+        <div id="countryText" class="banner-country"></div>
+      </div>
+      <button id="btnPause" class="icon-btn" type="button" aria-label="Pause"></button>
+    </header>
+
+    <div class="info panel-cream">
+      <div class="info-moves">
+        <div class="info-label">MOVES</div>
+        <div id="movesBadge" class="moves-badge"><span id="movesText">15</span></div>
+      </div>
+      <div class="info-goal">
+        <div class="info-label">GOAL</div>
+        <div id="goalText" class="goal-text">0 / 1000</div>
+        <div class="bar"><div id="goalFill" class="bar-fill"></div></div>
+      </div>
+      <div class="info-score">
+        <div class="info-label">SCORE</div>
+        <div id="scoreText" class="score-text">0</div>
+      </div>
+    </div>
+
+    <div id="boardWrap">
+      <canvas id="board" role="img" aria-label="Game board, 8 by 8 landmark tiles"></canvas>
+      <div id="floats" aria-hidden="true"></div>
+      <div id="praise" class="praise" aria-hidden="true"></div>
+      <div id="coach" class="coach" hidden></div>
+    </div>
+
+    <footer id="boosters" class="boosters"></footer>
+  </section>
+
+  <div id="modalRoot"></div>
+
+  <!-- Simulated full-screen ad (replaced by real AdMob when wrapped as an Android app) -->
+  <div id="adOverlay" class="overlay ad-overlay" hidden role="dialog" aria-modal="true" aria-label="Advertisement">
+    <div class="ad-screen">
+      <div class="ad-top">
+        <span class="ad-pill">Ad</span>
+        <span id="adReward" class="ad-reward"></span>
+        <span id="adCountdown" class="ad-countdown"></span>
+      </div>
+      <div class="ad-video" aria-hidden="true">
+        <div class="ad-float f1"></div><div class="ad-float f2"></div><div class="ad-float f3"></div>
+        <div class="ad-play"></div>
+        <div id="adTitle" class="ad-title"></div>
+        <div class="ad-sub">Test video ad. Real ads appear here in the Android app.</div>
+      </div>
+      <div class="ad-progress"><div id="adProgress"></div></div>
+      <div class="ad-actions">
+        <button id="adClaim" class="btn btn-green" type="button" hidden></button>
+        <button id="adSkip" class="btn btn-gray" type="button"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden role="status"></div>
+  <div id="srLive" class="sr-only" aria-live="polite"></div>
+  <canvas id="fx" aria-hidden="true"></canvas>
+</div>
+
+<!--INLINE_ASSETS--><!--/INLINE_ASSETS-->
+<!--INLINE_JS--><script src="core.js"></script><script src="config.js"></script><script src="countries.js"></script><script src="analytics.js"></script><script src="game.js"></script><!--/INLINE_JS-->
+</body>
+</html>
