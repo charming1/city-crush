@@ -837,24 +837,38 @@ window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeri
   let nativeBannerOn = false, nativeInit = null;
   if (nativeAds()) document.documentElement.classList.add('native-ads');
   const Ads = window.Ads = {
+    log: [],
+    debugLine() { return AD_CFG.debug && nativeAds() ? h('p', { id: 'adDebug', class: 'note', style: 'font-size:11px;word-break:break-word', text: 'Ad: ' + (Ads.log.slice(-1)[0] || 'no activity yet') }) : null; },
+    dbg(msg) { const t = new Date().toTimeString().slice(0, 8); Ads.log.push(t + ' ' + msg); if (Ads.log.length > 60) Ads.log.shift(); const dl = document.getElementById('adDebug'); if (dl) dl.textContent = 'Ad: ' + msg; if (AD_CFG.debug) { try { toast(msg); } catch (e) { } } },
+    _listen(A) {
+      if (Ads._listening) return; Ads._listening = true;
+      ['bannerAdLoaded', 'bannerAdFailedToLoad', 'bannerAdSizeChanged', 'bannerAdOpened', 'bannerAdClosed',
+        'onInterstitialAdLoaded', 'onInterstitialAdFailedToLoad', 'onInterstitialAdShowed', 'onInterstitialAdFailedToShow', 'onInterstitialAdDismissed',
+        'onRewardedVideoAdLoaded', 'onRewardedVideoAdFailedToLoad', 'onRewardedVideoAdShowed', 'onRewardedVideoAdFailedToShow', 'onRewardedVideoAdDismissed', 'onRewardedVideoAdReward',
+      ].forEach((n) => { try { A.addListener(n, (e) => { let d = ''; try { d = e ? ' ' + JSON.stringify(e) : ''; } catch (x) { } Ads.dbg(n.replace(/^on/, '') + d); }); } catch (x) { } });
+    },
+    async _init(A) {
+      if (!nativeInit) { Ads._listen(A); nativeInit = A.initialize({ initializeForTesting: !!AD_CFG.useTestIds }); Ads.dbg('AdMob starting'); }
+      try { await nativeInit; } catch (e) { nativeInit = null; throw e; }
+    },
     /** Real AdMob (Android app only). Falls back to the simulated ads in a browser. */
     async _native(kind) {
       const A = nativeAds(); if (!A) return null;
       try {
-        if (!nativeInit) nativeInit = A.initialize({ initializeForTesting: !!AD_CFG.useTestIds });
-        await nativeInit;
+        await Ads._init(A);
         if (kind === 'interstitial') {
-          await A.prepareInterstitial({ adId: AD_CFG.interstitial, isTesting: !!AD_CFG.useTestIds });
+          Ads.dbg('Loading country ad'); await A.prepareInterstitial({ adId: AD_CFG.interstitial, isTesting: !!AD_CFG.useTestIds });
           await A.showInterstitial(); return { shown: true };
         }
         let rewarded = false;
         const h1 = await A.addListener('onRewardedVideoAdReward', () => { rewarded = true; });
         try {
-          await A.prepareRewardVideoAd({ adId: AD_CFG.rewarded, isTesting: !!AD_CFG.useTestIds });
-          const r = await A.showRewardVideoAd(); if (r) rewarded = true;
+          Ads.dbg('Loading rewarded ad'); await A.prepareRewardVideoAd({ adId: AD_CFG.rewarded, isTesting: !!AD_CFG.useTestIds });
+          Ads.dbg('Rewarded ad ready'); const r = await A.showRewardVideoAd(); if (r) rewarded = true;
+          Ads.dbg('Rewarded ad finished, reward: ' + rewarded);
         } finally { try { h1.remove(); } catch (e) { } }
         return { shown: true, rewarded };
-      } catch (e) { if (AD_CFG.debug) toast('AdMob ' + kind + ' error: ' + ((e && (e.message || e.code)) || e)); return { shown: false, rewarded: false }; }
+      } catch (e) { Ads.dbg(kind + ' ad error: ' + ((e && (e.message || e.code)) || JSON.stringify(e))); return { shown: false, rewarded: false }; }
     },
     /** Shows the native banner on the home screen and in the win / out-of-moves popups, hides it elsewhere. */
     syncBanner() { if (!nativeAds()) return Promise.resolve(); Ads._q = (Ads._q || Promise.resolve()).then(() => Ads._sync()).catch(() => { }); return Ads._q; },
@@ -865,14 +879,12 @@ window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeri
       nativeBannerOn = want;
       try {
         if (want) {
-          if (!nativeInit) nativeInit = A.initialize({ initializeForTesting: !!AD_CFG.useTestIds });
-          await nativeInit;
-          if (!Ads._bl && AD_CFG.debug) { Ads._bl = true; try { A.addListener('bannerAdFailedToLoad', (e) => toast('Banner ad error ' + ((e && (e.code !== undefined ? e.code : e.errorCode)) || '') + ' ' + ((e && (e.message || e.reason)) || ''))); A.addListener('bannerAdLoaded', () => toast('Banner ad loaded')); A.addListener('bannerAdSizeChanged', (e) => toast('Banner size ' + (e && e.width) + ' x ' + (e && e.height))); } catch (x) { } }
+          await Ads._init(A);
           if (!Ads._warm) { Ads._warm = true; await new Promise((r) => setTimeout(r, 900)); if ($('screen-home').hidden && !document.querySelector('#modalRoot .ad-banner')) { nativeBannerOn = false; return; } }
-          if (AD_CFG.debug) toast('AdMob: asking for a banner...');
-          await A.showBanner({ adId: AD_CFG.banner, adSize: AD_CFG.bannerSize || 'BANNER', position: 'BOTTOM_CENTER', margin: AD_CFG.bannerMargin || 0, isTesting: !!AD_CFG.useTestIds });
-        } else await A.hideBanner();
-      } catch (e) { nativeBannerOn = false; if (AD_CFG.debug) toast('AdMob banner error: ' + ((e && (e.message || e.code)) || e)); }
+          Ads.dbg('Asking for banner'); await A.showBanner({ adId: AD_CFG.banner, adSize: AD_CFG.bannerSize || 'BANNER', position: 'BOTTOM_CENTER', margin: AD_CFG.bannerMargin || 0, isTesting: !!AD_CFG.useTestIds });
+          Ads.dbg('Banner call done');
+        } else { if (A.removeBanner) await A.removeBanner(); else await A.hideBanner(); Ads.dbg('Banner removed'); }
+      } catch (e) { nativeBannerOn = false; Ads.dbg('banner error: ' + ((e && (e.message || e.code)) || JSON.stringify(e))); }
     },
     _show(title, seconds, rewarded) {
       return new Promise((resolve) => {
@@ -1592,7 +1604,7 @@ window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeri
       bs, scoreEl,
       h('p', { class: 'note', text: Game.moves + (Game.moves === 1 ? ' move' : ' moves') + ' left' + (firstClear ? '' : ' · replay') }),
       h('div', { class: 'modal-stack' }, buttons),
-      Ads.banner());
+      Ads.debugLine(), Ads.banner());
     openModal(card, { dismiss: false });
 
     [...bs.children].forEach((el, i) => {
@@ -1626,7 +1638,7 @@ window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeri
       bar,
       h('p', { class: 'note', text: Game.score.toLocaleString() + ' of ' + Game.target.toLocaleString() + ' points' + (Game.rewardsUsed >= MAX_REWARDS ? '. No more bonus moves this level.' : '') }),
       h('div', { class: 'modal-stack' }, buttons),
-      Ads.banner()), { dismiss: false });
+      Ads.debugLine(), Ads.banner()), { dismiss: false });
   }
 
   // ====================================================================== pause + settings
@@ -1664,6 +1676,7 @@ window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeri
       h('h2', { text: 'Settings' }),
       toggleRow('Sound', 'sound'), toggleRow('Vibration', 'haptics'),
       reset,
+      AD_CFG.debug && nativeAds() ? h('div', { style: 'text-align:left' }, h('p', { class: 'note', text: 'Ad log' }), h('pre', { style: 'font:11px/1.35 monospace;white-space:pre-wrap;max-height:30vh;overflow:auto;background:#0003;border-radius:8px;padding:8px;margin:0', text: Ads.log.slice(-30).join('\n') || 'No ad activity yet' })) : null,
       h('div', { class: 'modal-stack' }, btn('Done', 'btn-green', closeModal))));
   }
 
