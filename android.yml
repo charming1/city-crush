@@ -12,6 +12,11 @@ jobs:
         with: { node-version: 20 }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
+      - name: Check the icon files were uploaded
+        run: |
+          for f in icon-only.png icon-foreground.png icon-background.png splash.png splash-dark.png; do
+            if [ ! -f "$f" ]; then echo "::error::$f is missing from the repo root. Upload all 5 PNG files next to index.html."; exit 1; fi
+          done
       - name: Create the Android project
         run: |
           npm install
@@ -29,6 +34,8 @@ jobs:
           PY
           npx capacitor-assets generate --android --assetPath . --iconBackgroundColor '#1f1547' --splashBackgroundColor '#1f1547'
           npx cap sync android
+          echo "Launcher icons generated:"; find android/app/src/main/res -name 'ic_launcher*' | head -20
+          test -n "$(find android/app/src/main/res -name 'ic_launcher_foreground.png' | head -1)" || { echo "::error::Icons were not generated"; exit 1; }
       - name: Build the APK
         working-directory: android
         run: ./gradlew assembleDebug
