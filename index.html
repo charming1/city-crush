@@ -350,7 +350,6 @@ body {
 .sheet-head h2 { margin: 0; }
 .sheet-flag { width: 34px; height: 34px; border-radius: 50%; box-shadow: 0 2px 0 rgba(0,0,0,.25); }
 
-.ad-banner-native { visibility: hidden; }
 
 
 .native-ads .home-banner { padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
@@ -393,7 +392,16 @@ body {
 .soon-icon { font-size: 64px; line-height: 1; margin-bottom: 8px; }
 .soon-card h3 { margin: 0 0 8px; font-family: var(--font-display); font-weight: var(--display-weight); font-size: 26px; color: #2a2a5a; }
 .soon-card p { margin: 0; font-weight: 800; color: #4a4a7a; line-height: 1.35; }
-#modalRoot .ad-banner-native { display: block; height: 60px; margin-top: 8px; } /* reserves the space; the native banner is moved to sit exactly here */
+/* Wooden ad frame: reserves the space; the native AdMob banner is placed exactly on top of it. If no ad arrives, the empty frame still looks intentional. */
+.ad-banner.ad-banner-native { position: relative; display: block; overflow: visible; box-sizing: border-box; width: 100%; max-width: none; height: 64px; border-radius: 12px; border: 3px solid #4a2a10;
+  background: repeating-linear-gradient(96deg, rgba(0,0,0,.08) 0 2px, transparent 2px 9px), linear-gradient(#a2693b, #6f4020 60%, #472810);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.28), inset 0 -3px 0 rgba(0,0,0,.35), 0 3px 0 rgba(0,0,0,.35); }
+.ad-banner-native::after { content: ""; position: absolute; inset: 4px 6px; border-radius: 6px; background: rgba(22,11,4,.6); box-shadow: inset 0 2px 4px rgba(0,0,0,.5); }
+.ad-banner-native::before { content: "AD"; position: absolute; z-index: 1; left: 14px; top: -15px; padding: 1px 12px 0; border: 2px solid #4a2a10; border-bottom: 0; border-radius: 8px 8px 0 0;
+  background: linear-gradient(#fff3cf, #e8cf92); color: #5a3a14; font: 800 11px/14px var(--font-display, system-ui); letter-spacing: .12em; }
+.home-banner .ad-banner.ad-banner-native { margin: 16px 0 0; }
+#modalRoot .ad-banner.ad-banner-native { position: absolute; z-index: 2; left: 4px; right: 4px; width: auto; margin: 0; bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
+.overlay:has(> .ad-banner-native) { padding-bottom: 104px; }
 </style>
 </head>
 <body>
@@ -988,28 +996,29 @@ window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeri
     // ---- banner: ask AdMob for ONE banner and then only hide / resume it, instead of requesting a new one every screen
     syncBanner() { if (!nativeAds()) return Promise.resolve(); Ads._q = (Ads._q || Promise.resolve()).then(() => Ads._sync()).catch(() => { }); return Ads._q; },
     _bannerWanted() { return !$('screen-home').hidden || !!document.querySelector('#modalRoot .ad-banner'); },
-    /** Distance (in dp) from the screen bottom to the bottom of the ad space inside an open pop-up, or the normal margin. */
-    _margin() {
-      const sp = document.querySelector('#modalRoot .ad-banner-native');
-      if (sp) { const rc = sp.getBoundingClientRect(); if (rc.height > 0) return Math.max(0, Math.round(innerHeight - rc.bottom)); }
-      return AD_CFG.bannerMargin || 0;
+    /** Where the banner goes: on top of the wooden ad frame (pop-up or home screen). Margin is the distance in dp from the screen bottom. */
+    _spot() {
+      const inModal = document.querySelector('#modalRoot .ad-banner-native');
+      const sp = inModal || (!$('screen-home').hidden && document.querySelector('#homeBanner .ad-banner-native'));
+      if (sp) { const rc = sp.getBoundingClientRect(); if (rc.height > 0) return { margin: Math.max(0, Math.round(innerHeight - rc.bottom + 7)), size: AD_CFG.bannerSize || 'BANNER' }; }
+      return { margin: AD_CFG.bannerMargin || 0, size: AD_CFG.bannerSize || 'BANNER' };
     },
     async _sync() {
       const A = nativeAds(); if (!A) return;
       let want = Ads._bannerWanted();
       if (want && document.querySelector('#modalRoot .ad-banner-native')) await new Promise((r) => setTimeout(r, 400)); // let the pop-up finish its entrance animation
       want = Ads._bannerWanted();
-      const margin = want ? Ads._margin() : 0;
-      if (want === nativeBannerOn && (!want || margin === Ads._margin0)) return;
+      const spot = want ? Ads._spot() : null, key = spot ? spot.margin + '|' + spot.size : '';
+      if (want === nativeBannerOn && (!want || key === Ads._key0)) return;
       nativeBannerOn = want;
       try {
         if (want) {
           await Ads._init(A);
-          if (Ads._bannerMade && margin === Ads._margin0) { await A.resumeBanner(); Ads.dbg('Banner shown again'); return; }
-          if (Ads._bannerMade) { try { await A.removeBanner(); } catch (e) { } Ads._bannerMade = false; } // position changed: place it again
+          if (Ads._bannerMade && key === Ads._key0) { await A.resumeBanner(); Ads.dbg('Banner shown again'); return; }
+          if (Ads._bannerMade) { try { await A.removeBanner(); } catch (e) { } Ads._bannerMade = false; } // position or size changed: place it again
           if (!Ads._warm) { Ads._warm = true; await new Promise((r) => setTimeout(r, 900)); if (!Ads._bannerWanted()) { nativeBannerOn = false; return; } }
-          Ads.dbg('Asking for banner'); Ads._bannerMade = true; Ads._margin0 = margin;
-          await A.showBanner({ adId: AD_CFG.banner, adSize: AD_CFG.bannerSize || 'BANNER', position: 'BOTTOM_CENTER', margin, isTesting: !!AD_CFG.useTestIds });
+          Ads.dbg('Asking for banner'); Ads._bannerMade = true; Ads._key0 = key;
+          await A.showBanner({ adId: AD_CFG.banner, adSize: spot.size, position: 'BOTTOM_CENTER', margin: spot.margin, isTesting: !!AD_CFG.useTestIds });
         } else if (Ads._bannerMade) { await A.hideBanner(); }
       } catch (e) { nativeBannerOn = false; Ads._bannerMade = false; Ads.dbg('banner error: ' + ((e && (e.message || e.code)) || JSON.stringify(e))); }
     },
@@ -1108,6 +1117,7 @@ window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeri
     const ov = h('div', { class: 'overlay', role: 'dialog', 'aria-modal': 'true' }, card);
     if (!opts || opts.dismiss !== false) ov.addEventListener('pointerdown', (e) => { if (e.target === ov) closeModal(); });
     root.append(ov);
+    const adSp = card.querySelector('.ad-banner-native'); if (adSp) ov.append(adSp); // the wooden ad frame sits at the bottom of the screen, outside the card
     Game.modalOpen = true; Game.modalLock = !!(opts && opts.dismiss === false);
     Ads.syncBanner();
     const first = card.querySelector('button'); if (first) { try { first.focus({ preventScroll: true }); } catch (e) { } }
