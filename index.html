@@ -393,6 +393,7 @@ body {
 .soon-icon { font-size: 64px; line-height: 1; margin-bottom: 8px; }
 .soon-card h3 { margin: 0 0 8px; font-family: var(--font-display); font-weight: var(--display-weight); font-size: 26px; color: #2a2a5a; }
 .soon-card p { margin: 0; font-weight: 800; color: #4a4a7a; line-height: 1.35; }
+#modalRoot .ad-banner-native { display: block; height: 60px; margin-top: 8px; } /* reserves the space; the native banner is moved to sit exactly here */
 </style>
 </head>
 <body>
@@ -402,7 +403,6 @@ body {
   <!-- Home -->
   <section id="screen-home" class="screen home">
     <h1 class="logo"><img id="logoImg" alt="City Crush" draggable="false"></h1>
-    <div id="homeHero" class="home-hero" aria-hidden="true"></div>
     <p class="tagline">Match landmarks. Tour the world.</p>
     <div class="home-actions">
       <button id="btnPlay" class="btn btn-green btn-xl" type="button">
@@ -988,18 +988,28 @@ window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeri
     // ---- banner: ask AdMob for ONE banner and then only hide / resume it, instead of requesting a new one every screen
     syncBanner() { if (!nativeAds()) return Promise.resolve(); Ads._q = (Ads._q || Promise.resolve()).then(() => Ads._sync()).catch(() => { }); return Ads._q; },
     _bannerWanted() { return !$('screen-home').hidden || !!document.querySelector('#modalRoot .ad-banner'); },
+    /** Distance (in dp) from the screen bottom to the bottom of the ad space inside an open pop-up, or the normal margin. */
+    _margin() {
+      const sp = document.querySelector('#modalRoot .ad-banner-native');
+      if (sp) { const rc = sp.getBoundingClientRect(); if (rc.height > 0) return Math.max(0, Math.round(innerHeight - rc.bottom)); }
+      return AD_CFG.bannerMargin || 0;
+    },
     async _sync() {
       const A = nativeAds(); if (!A) return;
-      const want = Ads._bannerWanted();
-      if (want === nativeBannerOn) return;
+      let want = Ads._bannerWanted();
+      if (want && document.querySelector('#modalRoot .ad-banner-native')) await new Promise((r) => setTimeout(r, 400)); // let the pop-up finish its entrance animation
+      want = Ads._bannerWanted();
+      const margin = want ? Ads._margin() : 0;
+      if (want === nativeBannerOn && (!want || margin === Ads._margin0)) return;
       nativeBannerOn = want;
       try {
         if (want) {
           await Ads._init(A);
-          if (Ads._bannerMade) { await A.resumeBanner(); Ads.dbg('Banner shown again'); return; }
+          if (Ads._bannerMade && margin === Ads._margin0) { await A.resumeBanner(); Ads.dbg('Banner shown again'); return; }
+          if (Ads._bannerMade) { try { await A.removeBanner(); } catch (e) { } Ads._bannerMade = false; } // position changed: place it again
           if (!Ads._warm) { Ads._warm = true; await new Promise((r) => setTimeout(r, 900)); if (!Ads._bannerWanted()) { nativeBannerOn = false; return; } }
-          Ads.dbg('Asking for banner'); Ads._bannerMade = true;
-          await A.showBanner({ adId: AD_CFG.banner, adSize: AD_CFG.bannerSize || 'BANNER', position: 'BOTTOM_CENTER', margin: AD_CFG.bannerMargin || 0, isTesting: !!AD_CFG.useTestIds });
+          Ads.dbg('Asking for banner'); Ads._bannerMade = true; Ads._margin0 = margin;
+          await A.showBanner({ adId: AD_CFG.banner, adSize: AD_CFG.bannerSize || 'BANNER', position: 'BOTTOM_CENTER', margin, isTesting: !!AD_CFG.useTestIds });
         } else if (Ads._bannerMade) { await A.hideBanner(); }
       } catch (e) { nativeBannerOn = false; Ads._bannerMade = false; Ads.dbg('banner error: ' + ((e && (e.message || e.code)) || JSON.stringify(e))); }
     },
@@ -1114,8 +1124,6 @@ window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeri
   function starsChipContent() { return [h('span', { html: starSvg(true), style: 'display:contents' }), State.totalStars() + ' / ' + MAX_STARS]; }
   function renderHome() {
     const li = $('logoImg'); if (li && !li.src) li.src = assetUrl('ui/logo.png');
-    const hero = $('homeHero'); hero.innerHTML = '';
-    COUNTRIES.slice(0, 6).forEach((c) => hero.append(lmImg(c, 0)));
     const hb = $('homeBanner'); hb.innerHTML = ''; hb.append(Ads.banner());
     const t = playTarget();
     $('playSub').textContent = t ? t.country.name + ' · Level ' + t.level : 'All countries complete';
