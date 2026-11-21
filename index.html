@@ -393,15 +393,21 @@ body {
 .soon-card h3 { margin: 0 0 8px; font-family: var(--font-display); font-weight: var(--display-weight); font-size: 26px; color: #2a2a5a; }
 .soon-card p { margin: 0; font-weight: 800; color: #4a4a7a; line-height: 1.35; }
 /* Wooden ad frame: reserves the space; the native AdMob banner is placed exactly on top of it. If no ad arrives, the empty frame still looks intentional. */
-.ad-banner.ad-banner-native { position: relative; display: block; overflow: visible; box-sizing: border-box; width: 100%; max-width: none; height: 64px; border-radius: 12px; border: 3px solid #4a2a10;
+.ad-banner.ad-banner-native { position: relative; display: block; overflow: visible; box-sizing: border-box; width: 100%; max-width: none; height: 72px; border-radius: 12px; border: 3px solid #4a2a10;
   background: repeating-linear-gradient(96deg, rgba(0,0,0,.08) 0 2px, transparent 2px 9px), linear-gradient(#a2693b, #6f4020 60%, #472810);
   box-shadow: inset 0 2px 0 rgba(255,255,255,.28), inset 0 -3px 0 rgba(0,0,0,.35), 0 3px 0 rgba(0,0,0,.35); }
 .ad-banner-native::after { content: ""; position: absolute; inset: 4px 6px; border-radius: 6px; background: rgba(22,11,4,.6); box-shadow: inset 0 2px 4px rgba(0,0,0,.5); }
 .ad-banner-native::before { content: "AD"; position: absolute; z-index: 1; left: 14px; top: -15px; padding: 1px 12px 0; border: 2px solid #4a2a10; border-bottom: 0; border-radius: 8px 8px 0 0;
   background: linear-gradient(#fff3cf, #e8cf92); color: #5a3a14; font: 800 11px/14px var(--font-display, system-ui); letter-spacing: .12em; }
-.home-banner .ad-banner.ad-banner-native { margin: 16px 0 0; }
-#modalRoot .ad-banner.ad-banner-native { position: absolute; z-index: 2; left: 4px; right: 4px; width: auto; margin: 0; bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
-.overlay:has(> .ad-banner-native) { padding-bottom: 104px; }
+.home-banner .ad-banner.ad-banner-native { margin: 16px auto 0; width: min(344px, 100%); }
+#modalRoot .ad-banner.ad-banner-native { position: absolute; z-index: 2; left: 50%; transform: translateX(-50%); width: min(344px, calc(100% - 8px)); margin: 0; bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
+.overlay:has(> .ad-banner-native) { padding-bottom: 112px; }
+
+/* the wooden ad frame appears only while a real ad is showing */
+.native-ads .ad-banner.ad-banner-native { visibility: hidden; }
+.native-ads.ad-live .ad-banner.ad-banner-native { visibility: visible; }
+.native-ads.ad-failed .ad-banner.ad-banner-native { display: none; }
+.native-ads.ad-failed .overlay:has(> .ad-banner-native) { padding-bottom: 16px; }
 </style>
 </head>
 <body>
@@ -663,7 +669,7 @@ window.APP_CONFIG = {
   admob: {
     debug: false,       // shows a small message when a banner loads or fails. Set to false before the Play Store
     bannerMargin: 0,    // Android keeps banners above the bottom bar by itself, for swipe and 3-button navigation
-    bannerSize: 'ADAPTIVE_BANNER',  // fits the phone's width. Use 'BANNER' for the fixed 320x50 size
+    bannerSize:'BANNER',  // fixed 320x50 so it fits the wooden frame
     useTestIds: false,  // live ads. Set to true again while testing on your own phone
     banner: 'ca-app-pub-2838889844136825/5371975002',
     interstitial: 'ca-app-pub-2838889844136825/5788274958',
@@ -954,7 +960,7 @@ window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeri
       ['bannerAdLoaded', 'bannerAdFailedToLoad', 'bannerAdSizeChanged', 'bannerAdOpened', 'bannerAdClosed',
         'onInterstitialAdLoaded', 'onInterstitialAdFailedToLoad', 'onInterstitialAdShowed', 'onInterstitialAdFailedToShow', 'onInterstitialAdDismissed',
         'onRewardedVideoAdLoaded', 'onRewardedVideoAdFailedToLoad', 'onRewardedVideoAdShowed', 'onRewardedVideoAdFailedToShow', 'onRewardedVideoAdDismissed', 'onRewardedVideoAdReward',
-      ].forEach((n) => { try { A.addListener(n, (e) => { let d = ''; try { d = e ? ' ' + JSON.stringify(e) : ''; } catch (x) { } Ads.dbg(n.replace(/^on/, '') + d); if (n === 'bannerAdFailedToLoad') Ads._bannerFailed(); if (n === 'bannerAdLoaded') Ads._bTries = 0; }); } catch (x) { } });
+      ].forEach((n) => { try { A.addListener(n, (e) => { let d = ''; try { d = e ? ' ' + JSON.stringify(e) : ''; } catch (x) { } Ads.dbg(n.replace(/^on/, '') + d); if (n === 'bannerAdFailedToLoad') { Ads._adState('failed'); Ads._bannerFailed(); } if (n === 'bannerAdLoaded') { Ads._bTries = 0; Ads._adState('live'); } }); } catch (x) { } });
     },
     async _init(A) {
       if (!nativeInit) { Ads._listen(A); nativeInit = A.initialize({ initializeForTesting: !!AD_CFG.useTestIds }); Ads.dbg('AdMob starting'); }
@@ -1000,8 +1006,8 @@ window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeri
     _spot() {
       const inModal = document.querySelector('#modalRoot .ad-banner-native');
       const sp = inModal || (!$('screen-home').hidden && document.querySelector('#homeBanner .ad-banner-native'));
-      if (sp) { const rc = sp.getBoundingClientRect(); if (rc.height > 0) return { margin: Math.max(0, Math.round(innerHeight - rc.bottom + 7)), size: AD_CFG.bannerSize || 'BANNER' }; }
-      return { margin: AD_CFG.bannerMargin || 0, size: AD_CFG.bannerSize || 'BANNER' };
+      if (sp) { const rc = sp.getBoundingClientRect(); if (rc.height > 0) return { margin: Math.max(0, Math.round(innerHeight - rc.bottom + 7)), size: 'BANNER' }; }
+      return { margin: AD_CFG.bannerMargin || 0, size: 'BANNER' };
     },
     async _sync() {
       const A = nativeAds(); if (!A) return;
@@ -1017,12 +1023,14 @@ window.EXTRA_COUNTRIES=[["AF", "Afghanistan"], ["AL", "Albania"], ["DZ", "Algeri
           if (Ads._bannerMade && key === Ads._key0) { await A.resumeBanner(); Ads.dbg('Banner shown again'); return; }
           if (Ads._bannerMade) { try { await A.removeBanner(); } catch (e) { } Ads._bannerMade = false; } // position or size changed: place it again
           if (!Ads._warm) { Ads._warm = true; await new Promise((r) => setTimeout(r, 900)); if (!Ads._bannerWanted()) { nativeBannerOn = false; return; } }
-          Ads.dbg('Asking for banner'); Ads._bannerMade = true; Ads._key0 = key;
+          Ads._adState('unknown'); Ads.dbg('Asking for banner'); Ads._bannerMade = true; Ads._key0 = key;
           await A.showBanner({ adId: AD_CFG.banner, adSize: spot.size, position: 'BOTTOM_CENTER', margin: spot.margin, isTesting: !!AD_CFG.useTestIds });
         } else if (Ads._bannerMade) { await A.hideBanner(); }
       } catch (e) { nativeBannerOn = false; Ads._bannerMade = false; Ads.dbg('banner error: ' + ((e && (e.message || e.code)) || JSON.stringify(e))); }
     },
     /** AdMob had no banner: wait, then ask again (30s, 1m, 2m, 4m, 5m) while the player is on a screen that shows one. */
+    /** The wooden frame only shows while a real ad is live. 'unknown' keeps the space reserved; 'failed' collapses it. */
+    _adState(st) { const c = document.documentElement.classList; c.toggle('ad-live', st === 'live'); c.toggle('ad-failed', st === 'failed'); },
     _bannerFailed() {
       const n = (Ads._bTries = (Ads._bTries || 0) + 1); if (n > 5) return;
       setTimeout(async () => {
